@@ -1,10 +1,10 @@
 import subprocess
 import os
-from logging import Logger
+from logger import Logger
 
-
+from logging import Logger as LG
 class GitHandler:
-    Logger: Logger
+    logger: LG
 
     def __init__(self, repo_path="."):
         """
@@ -13,9 +13,9 @@ class GitHandler:
         """
         self.repo_path = os.path.abspath(repo_path)
         os.makedirs(self.repo_path, exist_ok=True)
-        self.Logger = Logger.manager.getLogger("GIT")
+        self.logger = Logger("GIT").get_logger()
         if not self.is_git_repo():
-            self.Logger.warning("No Git repository found. Initializing a new one...")
+            self.logger.warning("No Git repository found. Initializing a new one...")
             self.init_repo()
 
     def run_git_command(self, command):
@@ -53,6 +53,19 @@ class GitHandler:
         self.run_git_command(["add", "-A"])  # Auto-tracks all existing and new files
         return "Initialized Git repository and enabled auto-tracking of all files."
 
+    def add_remote(self, remote_url, remote_name="origin"):
+        """
+        Adds a remote URL to the repository.
+        If the remote already exists, it updates the remote URL instead of adding a duplicate.
+        """
+        existing_remotes = self.run_git_command(["remote", "-v"])
+
+        if remote_name in existing_remotes:
+            self.logger.warning(f"Remote '{remote_name}' already exists. Updating URL...")
+            return self.run_git_command(["remote", "set-url", remote_name, remote_url])
+
+        return self.run_git_command(["remote", "add", remote_name, remote_url])
+
     def push(self, remote="origin", branch="main"):
         """ Pushes the current branch to the specified remote. """
         return self.run_git_command(["push", remote, branch])
@@ -89,7 +102,7 @@ class GitHandler:
 
         # Determine file extension based on language (default to .txt if unknown)
         lang = data.get("lang", {}).get("name", "txt").lower()
-        extension = {"cpp": "cpp", "python": "py", "java": "java"}.get(lang, "txt")
+        extension = {"cpp": "cpp", "python": "py", "python3": "py", "java": "java"}.get(lang, "txt")
         file_name = f"{title_slug}.{extension}"
         file_path = os.path.join(self.repo_path, file_name)
 
@@ -107,4 +120,3 @@ class GitHandler:
         )
 
         return self.commit(title_slug, description, file_path)
-
