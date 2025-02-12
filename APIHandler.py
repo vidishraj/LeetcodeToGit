@@ -8,7 +8,7 @@ class APIHandler:
         self.cookies = cookies
 
     @staticmethod
-    def getSubmissionQuery(self, submissionId):
+    def getSubmissionQuery(submissionId):
         return {
             "query": "\n    query submissionDetails($submissionId: Int!) {\n  submissionDetails(submissionId: "
                      "$submissionId) {\n    runtime\n    runtimeDisplay\n    runtimePercentile\n    "
@@ -27,7 +27,7 @@ class APIHandler:
         }
 
     @staticmethod
-    def getProblemListQuery(self, difficulty=['HARD', 'EASY', 'MEDIUM'], skip=50, limit=50):
+    def getProblemListQuery(difficulty, skip=50, limit=50):
         return {
             "query": "\n    query userProgressQuestionList($filters: UserProgressQuestionListInput) {\n  "
                      "userProgressQuestionList(filters: $filters) {\n    totalNum\n    questions {\n      "
@@ -48,7 +48,28 @@ class APIHandler:
         }
 
     @staticmethod
-    def getSubmissionListQuery(self, questionSlug):
+    def getQuestionCountQuery(difficulty):
+        return {
+            "query": "\n    query userProgressQuestionList($filters: UserProgressQuestionListInput) {\n  "
+                     "userProgressQuestionList(filters: $filters) {\n    totalNum\n    questions {\n      "
+                     "translatedTitle\n      frontendId\n      title\n      titleSlug\n      difficulty\n      "
+                     "lastSubmittedAt\n      numSubmitted\n      questionStatus\n      lastResult\n      topicTags {"
+                     "\n        name\n        nameTranslated\n        slug\n      }\n    }\n  }\n}\n    ",
+            "variables": {
+                "filters": {
+                    "difficulty": difficulty,
+                    "questionStatus": "SOLVED",
+                    "skip": 0,
+                    "limit": 0,
+                    "sortOrder": "DESCENDING",
+                    "sortField": "LAST_SUBMITTED_AT"
+                }
+            },
+            "operationName": "userProgressQuestionList"
+        }
+
+    @staticmethod
+    def getSubmissionListQuery(questionSlug):
         return {
             "query": "\n    query submissionList($offset: Int!, $limit: Int!, $lastKey: String, $questionSlug: "
                      "String!, $lang: Int, $status: Int) {\n  questionSubmissionList(\n    offset: $offset\n    "
@@ -68,10 +89,12 @@ class APIHandler:
     def makeRequest(self, query):
         APIUrl = "https://leetcode.com/graphql/"
         headers = {
-            "Cookies": self.cookies,
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)"
-                          " Chrome/132.0.0.0 Safari/537.36"
+            "Cookie": self.cookies,
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)"
+                          " Chrome/132.0.0.0 Safari/537.36",
+            "Content-Type": "application/json",
+            "host": "leetcode.com"
         }
 
-        response = requests.post(APIUrl, query, headers=headers)
+        response = requests.post(APIUrl, json=query, headers=headers)
         return response
