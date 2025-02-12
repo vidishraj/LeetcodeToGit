@@ -1,4 +1,5 @@
-import logging
+
+from logger import Logger
 from collections import defaultdict
 
 from APIHandler import APIHandler
@@ -6,7 +7,7 @@ from APIHandler import APIHandler
 
 class Leetcode:
     def __init__(self, apiHandler: APIHandler):
-        self.Logger = logging.getLogger("LEETCODE")
+        self.logger = Logger("LEETCODE").get_logger()
         self.apiHandler = apiHandler
 
     def convert_to_defaultdict(self, d):
@@ -23,7 +24,7 @@ class Leetcode:
         countResponse = self.apiHandler.makeRequest(countQuery)
 
         if countResponse.status_code != 200:
-            self.Logger.error(f"Error from Leetcode while fetching problem count. Check cookies or internet! \n"
+            self.logger.error(f"Error from Leetcode while fetching problem count. Check cookies or internet! \n"
                               f"Status Code: {countResponse.status_code}")
             exit(0)  # Explicitly return None
         jsonResponse = countResponse.json()
@@ -31,21 +32,21 @@ class Leetcode:
         dfDict = self.convert_to_defaultdict(jsonResponse)
         limit = dfDict['data']['userProgressQuestionList']['totalNum']
         if limit is None or limit == 0:
-            logging.error("No questions available to fetch. Are your filters okay?")
+            self.logger.error("No questions available to fetch. Are your filters okay?")
             exit(0)
         limit += 1
         skip = 0
         problemsQuery = self.apiHandler.getProblemListQuery(difficulty, skip, limit)
         problemListResponse = self.apiHandler.makeRequest(problemsQuery)  # Assuming this returns the problem list
         if problemListResponse.status_code != 200:
-            self.Logger.error(f"Error from Leetcode while fetching problem list. Check cookies or internet! \n"
+            self.logger.error(f"Error from Leetcode while fetching problem list. Check cookies or internet! \n"
                               f"Status Code: {problemListResponse.status_code}")
             exit(0)  # Explicitly return None
         jsonResponse = problemListResponse.json()
         problemListResponseDict = self.convert_to_defaultdict(jsonResponse)
         questionList = problemListResponseDict['data']['userProgressQuestionList']['questions']
         if questionList is None:
-            self.Logger.error("Error fetching final question list. Response status was okay. Is response mangled?")
+            self.logger.error("Error fetching final question list. Response status was okay. Is response mangled?")
             exit(0)
         return questionList
 
@@ -54,7 +55,7 @@ class Leetcode:
 
         def checkSubmissionResponse(response):
             if response.status_code != 200:
-                self.Logger.error(f"Error from Leetcode while fetching submission list. Check cookies or internet or "
+                self.logger.error(f"Error from Leetcode while fetching submission list. Check cookies or internet or "
                                   f"question slug! \n"
                                   f"Status Code: {response.status_code}")
                 exit(0)
@@ -69,12 +70,12 @@ class Leetcode:
             hasNext = submissionResponseDict['data']['questionSubmissionList']['hasNext']
             submissions = submissionResponseDict['data']['questionSubmissionList']['submissions']
             if hasNext is None or submissions is None:
-                self.Logger.error("Submission List response is mangled.")
+                self.logger.error("Submission List response is mangled.")
                 exit(0)
             for submission in submissions:
                 submission = self.convert_to_defaultdict(submission)
                 if submission['status'] == 10:
-                    self.Logger.info(f"Submission found for question {submission}")
+                    self.logger.info(f"Submission found for question {submission['title']}")
                     return submission['id']
             if not hasNext:
                 break
@@ -82,13 +83,13 @@ class Leetcode:
             startOffset += 20
             submissionListQuery = self.apiHandler.getSubmissionListQuery(questionSlug, startOffset)
             submissionListResponse = self.apiHandler.makeRequest(submissionListQuery)
-        self.Logger.error(f"Could not find a submission for question slug {questionSlug}")
+        self.logger.error(f"Could not find a submission for question slug {questionSlug}")
 
     def getSubmission(self, submissionId):
         submissionQuery = self.apiHandler.getSubmissionQuery(submissionId)
         submissionResponse = self.apiHandler.makeRequest(submissionQuery)
         if submissionResponse.status_code != 200:
-            self.Logger.error(f"Error from Leetcode while fetching submission. Check cookies or internet or "
+            self.logger.error(f"Error from Leetcode while fetching submission. Check cookies or internet or "
                               f"question slug! \n"
                               f"Status Code: {submissionResponse.status_code}")
             exit(0)
@@ -96,6 +97,6 @@ class Leetcode:
         submissionDict = self.convert_to_defaultdict(submissionJson)
         submission = submissionDict['data']['submissionDetails']
         if submission is None:
-            self.Logger.error(f"Error from Leetcode while fetching submission. Data seems to be mangled")
+            self.logger.error(f"Error from Leetcode while fetching submission. Data seems to be mangled")
             exit(0)
         return submission
