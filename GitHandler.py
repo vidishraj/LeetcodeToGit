@@ -1,5 +1,6 @@
 import subprocess
 import os
+from logging import Logger
 
 
 class GitHandler:
@@ -64,8 +65,46 @@ class GitHandler:
         """ Switches to the specified branch. """
         return self.run_git_command(["checkout", branch_name])
 
-    def commit(self, message):
-        """ Commits changes with the given commit message. """
-        return self.run_git_command(["commit", "-am", message])
+    def commit(self, message, description="", body=""):
+        """ Commits changes with the given commit message, description, and body. """
+        commit_message = f"{message}\n\n{description}\n\n{body}"
+        return self.run_git_command(["commit", "-am", commit_message])
 
+    def commit_from_data(self, data):
+        """
+        Creates a Git commit using the provided dictionary.
+        - Creates a file `{titleSlug}.cpp`
+        - Writes the provided code inside
+        - Stages & commits the file with a formatted commit message
+        """
+        title_slug = data.get("question", {}).get("titleSlug", "untitled")
+        runtime = data.get("runtime", "N/A")
+        runtime_percentile = data.get("runtimePercentile", "N/A")
+        memory = data.get("memory", "N/A")
+        memory_percentile = data.get("memoryPercentile", "N/A")
+        code = data.get("code", "")
+
+        if not code:
+            return "Error: No code provided to commit."
+
+        # Determine file extension based on language (default to .txt if unknown)
+        lang = data.get("lang", {}).get("name", "txt").lower()
+        extension = {"cpp": "cpp", "python": "py", "java": "java"}.get(lang, "txt")
+        file_name = f"{title_slug}.{extension}"
+        file_path = os.path.join(self.repo_path, file_name)
+
+        # Write code to file
+        with open(file_path, "w", encoding="utf-8") as file:
+            file.write(code)
+
+        # Stage the file before committing
+        self.run_git_command(["add", file_path])
+
+        # Format commit description
+        description = (
+            f"Runtime: {runtime} ms ({runtime_percentile} percentile)\n"
+            f"Memory: {memory} bytes ({memory_percentile} percentile)"
+        )
+
+        return self.commit(title_slug, description, file_path)
 
