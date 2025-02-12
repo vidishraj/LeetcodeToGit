@@ -49,7 +49,7 @@ class Leetcode:
             exit(0)
         return questionList
 
-    def submissionListForQuestion(self, questionSlug):
+    def getSubmissionListForQuestion(self, questionSlug):
         startOffset = 0
 
         def checkSubmissionResponse(response):
@@ -83,3 +83,19 @@ class Leetcode:
             submissionListQuery = self.apiHandler.getSubmissionListQuery(questionSlug, startOffset)
             submissionListResponse = self.apiHandler.makeRequest(submissionListQuery)
         self.Logger.error(f"Could not find a submission for question slug {questionSlug}")
+
+    def getSubmission(self, submissionId):
+        submissionQuery = self.apiHandler.getSubmissionQuery(submissionId)
+        submissionResponse = self.apiHandler.makeRequest(submissionQuery)
+        if submissionResponse.status_code != 200:
+            self.Logger.error(f"Error from Leetcode while fetching submission. Check cookies or internet or "
+                              f"question slug! \n"
+                              f"Status Code: {submissionResponse.status_code}")
+            exit(0)
+        submissionJson = submissionResponse.json()
+        submissionDict = self.convert_to_defaultdict(submissionJson)
+        submission = submissionDict['data']['submissionDetails']
+        if submission is None:
+            self.Logger.error(f"Error from Leetcode while fetching submission. Data seems to be mangled")
+            exit(0)
+        return submission
