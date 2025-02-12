@@ -69,7 +69,7 @@ class APIHandler:
         }
 
     @staticmethod
-    def getSubmissionListQuery(questionSlug):
+    def getSubmissionListQuery(questionSlug, offset):
         return {
             "query": "\n    query submissionList($offset: Int!, $limit: Int!, $lastKey: String, $questionSlug: "
                      "String!, $lang: Int, $status: Int) {\n  questionSubmissionList(\n    offset: $offset\n    "
@@ -80,7 +80,7 @@ class APIHandler:
                      "flagType\n      frontendId\n      topicTags {\n        id\n      }\n    }\n  }\n}\n    ",
             "variables": {
                 "questionSlug": questionSlug,
-                "offset": 0,
+                "offset": offset,
                 "limit": 20,
             },
             "operationName": "submissionList"
