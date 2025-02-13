@@ -1,23 +1,40 @@
 import subprocess
 import os
+from decimal import Decimal, ROUND_DOWN
+
 from logger import Logger
 from logging import Logger as LG
 
+
 class GitHandler:
     logger: LG
+    gitToken: str
+    remote: str
+    pushToRemote: bool
 
-    def __init__(self, repo_path="."):
+    def __init__(self, token=None):
+        if token is not None:
+            self.gitToken = token
+
+    def setRemote(self, remoteUrl):
+        self.remote = remoteUrl
+
+    def setToken(self, token):
+        self.gitToken = token
+
+    def init_local_repo(self, repoPath):
         """
-        Initialize the GitHandler with a repository path.
         If the path is not a Git repository, it initializes one with a README.
         """
-        self.repo_path = os.path.abspath(repo_path)
+        self.repo_path = os.path.abspath(repoPath)
         os.makedirs(self.repo_path, exist_ok=True)
         self.logger = Logger("GIT").get_logger()
 
         if not self.is_git_repo():
             self.logger.warning("No Git repository found. Initializing a new one with README...")
             self.init_repo()
+        else:
+            self.logger.info("Repository exists in local.")
 
         # Ensure README exists
         self.ensure_readme()
@@ -57,17 +74,23 @@ class GitHandler:
             with open(readme_path, "w", encoding="utf-8") as readme:
                 readme.write("# 🚀 LeetCode Submissions\n")
                 readme.write("### Track your progress with performance insights!\n\n")
-                readme.write("| Problem | Runtime Percentile | Memory Percentile |\n")
-                readme.write("|---------|-------------------|-------------------|\n")
+                readme.write("| Problem | Runtime Percentile | Memory Percentile | Difficulty |\n")
+                readme.write("|---------|-------------------|-------------------|-------------------|\n")
             self.run_git_command(["add", "README.md"])
             self.commit("Added README.md", "Initialized the repository with a README file.")
 
     def commit(self, message, description="", body=""):
         """ Commits changes with a given commit message, description, and body. """
         commit_message = f"{message}\n\n{description}\n\n{body}"
-        return self.run_git_command(["commit", "-am", commit_message])
+        commit_result = self.run_git_command(["commit", "-am", commit_message])
+        if "Error" in commit_result:
+            raise RuntimeWarning(f"Commit failed to local with result {commit_result}")  # Raise warning on failure
 
-    def commit_from_data(self, data):
+            # Get the latest commit hash
+        commit_hash = self.run_git_command(["rev-parse", "HEAD"])
+        return commit_hash
+
+    def commit_from_data(self, data, difficulty, title):
         """
         Creates a Git commit using the provided dictionary.
         - Creates a file `{titleSlug}.cpp`
@@ -109,20 +132,20 @@ class GitHandler:
         )
 
         # Commit the new file
-        commit_result = self.commit(title_slug, description, file_path)
+        commit_hash = self.commit(title_slug, description, file_path)
 
         # Update README.md
-        self.update_readme(title_slug, runtime_percentile, memory_percentile)
+        self.update_readme(title, runtime_percentile, memory_percentile, difficulty)
 
-        return commit_result
+        return commit_hash
 
-    def update_readme(self, title_slug, runtime_percentile, memory_percentile):
+    def update_readme(self, title_slug, runtime_percentile, memory_percentile, difficulty):
         """ Adds a new row to README.md with submission details. """
         readme_path = os.path.join(self.repo_path, "README.md")
         try:
-            new_line = f"| {title_slug} | {int(runtime_percentile)}% | {int(memory_percentile)}% |\n"
+            new_line = f"| {title_slug} | {Decimal(runtime_percentile).quantize(Decimal('.01'), ROUND_DOWN)}% | {Decimal(memory_percentile).quantize(Decimal('.01'), ROUND_DOWN)}% | {difficulty} |\n"
         except:
-            new_line = f"| {title_slug} | {runtime_percentile}% | {memory_percentile}% |\n"
+            new_line = f"| {title_slug} | {runtime_percentile}% | {memory_percentile}% | {difficulty} |\n"
 
         with open(readme_path, "a", encoding="utf-8") as readme:
             readme.write(new_line)
@@ -142,6 +165,87 @@ class GitHandler:
             return self.run_git_command(["remote", "set-url", remote_name, remote_url])
 
         return self.run_git_command(["remote", "add", remote_name, remote_url])
-    def push(self, remote="origin", branch="main"):
-        """ Pushes the current branch to the specified remote. """
-        return self.run_git_command(["push", remote, branch])
+
+    def push(self):
+        """ Force pushes the current branch to the specified remote. """
+        return self.run_git_command(["push", "--force", self.remote, "master"])
+
+    import subprocess
+
+    def can_push_to_git(self):
+        """
+        Checks if the user has valid Git credentials and can connect to the specified remote.
+        Returns True if authentication is successful, otherwise returns False.
+        """
+        remote = self.remote
+        if not remote:
+            self.logger.error("Error: No remote URL provided. Cannot check Git push ability.")
+            self.pushToRemote = False
+            return False
+
+        try:
+            # Check if Git is installed
+            subprocess.run(["git", "--version"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+            # Check if the remote is accessible
+            check_remote = subprocess.run(
+                ["git", "ls-remote", remote], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            )
+
+            if check_remote.returncode == 0:
+                self.pushToRemote = True
+                return True
+            else:
+                self.logger.error(f"Error: Unable to access Git remote: {check_remote.stderr.strip()}")
+                self.pushToRemote = False
+                return False
+
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Git error: {e}")
+            self.pushToRemote = False
+            return False
+
+    def is_local_up_to_date(self):
+        """
+        Compares the local repository state with the remote repository state.
+        Returns True if both are the same, False otherwise.
+        """
+        try:
+            # Fetch the latest updates from the remote repository
+            self.run_git_command(["fetch", self.remote])
+
+            # Get the local and remote commit hashes
+            local_commit = self.run_git_command(["rev-parse", "HEAD"])
+            remote_commit = self.run_git_command(["rev-parse", f"origin/main"])
+
+            # Compare the hashes
+            return local_commit == remote_commit
+        except Exception as e:
+            self.logger.error(f"Error checking repo state: {e}")
+            return False
+
+    def revert_commits(self, commit_hashes):
+        """
+        Reverts a list of commit hashes one by one.
+        If a commit cannot be reverted, it logs an error and continues with the next one.
+        """
+        if not commit_hashes:
+            self.logger.warning("No commit hashes provided to revert.")
+            return False
+
+        for commit in commit_hashes:
+            self.logger.info(f"Reverting commit: {commit}")
+            result = self.run_git_command(["revert", "--no-commit", commit])
+
+            if "Error" in result:
+                self.logger.error(f"Failed to revert commit {commit}: {result}")
+                return False
+
+        # Commit all reverted changes in one go
+        final_commit = self.commit("Reverted commits", "Batch reverted the given commits.")
+
+        if "Error" in final_commit:
+            self.logger.error(f"Failed to commit reverted changes: {final_commit}")
+            return False
+
+        return True
