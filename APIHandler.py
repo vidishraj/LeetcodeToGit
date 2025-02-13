@@ -1,10 +1,15 @@
 import requests
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 
 class APIHandler:
     cookies: str
 
-    def __init__(self, cookies):
+    def __init__(self, cookies=None):
+        if cookies is not None:
+            self.cookies = cookies
+
+    def setCookies(self, cookies):
         self.cookies = cookies
 
     @staticmethod
@@ -86,6 +91,12 @@ class APIHandler:
             "operationName": "submissionList"
         }
 
+    @retry(
+        retry=retry_if_exception_type(requests.exceptions.RequestException),
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=1, min=1, max=10),
+        reraise=True
+    )
     def makeRequest(self, query):
         APIUrl = "https://leetcode.com/graphql/"
         headers = {
@@ -96,5 +107,9 @@ class APIHandler:
             "host": "leetcode.com"
         }
 
-        response = requests.post(APIUrl, json=query, headers=headers)
+        response = requests.post(APIUrl, json=query, headers=headers, timeout=10)
+
+        # Raise an error for non-200 responses
+        response.raise_for_status()
+
         return response
