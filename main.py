@@ -96,11 +96,14 @@ class ApplicationRunner:
             submissionIds = []
             for problem in problemList:
                 questionSlug = problem['titleSlug']
-                self.logger.info(f"Fetching best submission for {questionSlug}")
                 try:
-                    submissionId, submissionTitle = self.leetCodeHandler.getSubmissionListForQuestion(questionSlug)
-                    submissionIds.append({questionSlug: [submissionId, submissionTitle, problem['difficulty']]})
-                    self.logger.info(f"Best submission fetched for {questionSlug}")
+                    if self.gitHandler.checkIfSolutionExists(questionSlug):
+                        self.logger.warning(f"Solution already exists for {questionSlug}")
+                    else:
+                        self.logger.info(f"Fetching best submission for {questionSlug}")
+                        submissionId, submissionTitle = self.leetCodeHandler.getSubmissionListForQuestion(questionSlug)
+                        submissionIds.append({questionSlug: [submissionId, submissionTitle, problem['difficulty']]})
+                        self.logger.info(f"Best submission fetched for {questionSlug}")
                 except RuntimeWarning as rm:
                     # Failed to fetch submission for one
                     self.logger.warning(f"{rm.__str__()}")
@@ -162,6 +165,8 @@ class ApplicationRunner:
             self.logger.info(f"{ex}")
             exit(0)
         finally:
+            self.logger.info("Adding summary to read me")
+            self.gitHandler.addSummaryToReadMe()
             self.logger.info(f"Ending stage 3 with {questions} submissions processed")
             self.logger.info("---Stage 3 ended------")
 

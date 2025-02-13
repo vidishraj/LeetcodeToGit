@@ -4,7 +4,7 @@ from decimal import Decimal, ROUND_DOWN
 
 from logger import Logger
 from logging import Logger as LG
-
+import pandas as pd
 
 class GitHandler:
     logger: LG
@@ -249,3 +249,65 @@ class GitHandler:
             return False
 
         return True
+
+    def checkIfSolutionExists(self, title_slug):
+        """
+        Checks if a solution file (with any extension) already exists in the local repo.
+        """
+        # List all files in the repository
+        for file in os.listdir(self.repo_path):
+            if file.startswith(f"{title_slug}."):  # Match any extension
+                return True
+        return False
+
+    def addSummaryToReadMe(self):
+        readme_path = os.path.join(self.repo_path, "README.md")
+
+        with open(readme_path, "r", encoding="utf-8") as file:
+            lines = file.readlines()
+
+        # Identify start and end of the existing summary (if any)
+        summary_start = next((i for i, line in enumerate(lines) if "## 📊 LeetCode Summary" in line), None)
+        table_start = next((i for i, line in enumerate(lines) if "| Problem |" in line), None)
+
+        if table_start is None:
+            print("⚠️ Table not found in README.md")
+            return
+
+        table_start += 2  # Skip header lines
+        data_lines = [line.strip() for line in lines[table_start:] if line.strip().startswith("|")]
+
+        # Extract data and clean it
+        data = [line.split("|")[1:-1] for line in data_lines if len(line.split("|")) > 4]
+        df = pd.DataFrame(data, columns=["Problem", "Runtime", "Memory", "Difficulty"])
+
+        # Convert values to float
+        df["Runtime"] = df["Runtime"].str.strip().str.replace("%", "", regex=False).astype(float)
+        df["Memory"] = df["Memory"].str.strip().str.replace("%", "", regex=False).astype(float)
+
+        # Compute summary statistics
+        summary_df = df.groupby("Difficulty").agg(
+            Total=("Problem", "count"),
+            Avg_Runtime=("Runtime", "mean"),
+            Avg_Memory=("Memory", "mean")
+        ).round(2).reset_index()
+
+        # Generate summary text
+        summary_text = f"## 📊 LeetCode Summary\n**Total questions done: {len(df)}**\n\n"
+        summary_text += "| Difficulty | Total Questions | Avg Runtime | Avg Memory |\n"
+        summary_text += "|------------|----------------|-------------|------------|\n"
+        summary_text += "\n".join(
+            f"| {row.Difficulty} | {row.Total} | {row.Avg_Runtime}% | {row.Avg_Memory}% |"
+            for _, row in summary_df.iterrows()
+        ) + "\n\n"
+
+        # Remove existing summary (if present)
+        if summary_start is not None:
+            lines = lines[summary_start:]  # Remove old summary
+
+        # Write the updated content
+        with open(readme_path, "w", encoding="utf-8") as file:
+            file.write(summary_text + "".join(lines))
+
+        # Commit the changes
+        self.commit("Updated LeetCode Summary in README.md")
