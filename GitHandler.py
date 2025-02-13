@@ -6,6 +6,7 @@ from logger import Logger
 from logging import Logger as LG
 import pandas as pd
 
+
 class GitHandler:
     logger: LG
     gitToken: str
@@ -51,7 +52,17 @@ class GitHandler:
 
         if "nothing to commit" in result.stderr.lower():
             return "Nothing to commit, working tree clean."
-
+        if self.gitToken is not None and any(err in result.stderr.lower() for err in
+                                             ["authentication failed", "fatal: unable to access",
+                                              "could not read from remote repository"]):
+            # Modify the command to use gitToken for authentication
+            self.logger.warning("Remote operation failed. Using the provided git token instead.")
+            if "push" in command or "fetch" in command or "pull" in command:
+                remote_url = self.run_git_command(["config", "--get", "remote.origin.url"])
+                if remote_url.startswith("https://"):
+                    # Inject gitToken into the remote URL
+                    tokenized_url = remote_url.replace("https://", f"https://{self.gitToken}@")
+                    return self.run_git_command(["remote", "set-url", "origin", tokenized_url])
         return f"Error: {result.stderr.strip()}"
 
     def is_git_repo(self):
