@@ -166,7 +166,10 @@ class ApplicationRunner:
             exit(0)
         finally:
             self.logger.info("Adding summary to read me")
-            self.gitHandler.addSummaryToReadMe()
+            try:
+                self.gitHandler.addSummaryToReadMe()
+            except Exception as ex:
+                self.logger.warning(f"Some issue occurred while updating git summary. {ex}")
             self.logger.info(f"Ending stage 3 with {questions} submissions processed")
             self.logger.info("---Stage 3 ended------")
 
