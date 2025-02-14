@@ -52,6 +52,7 @@ class GitHandler:
 
         if "nothing to commit" in result.stderr.lower():
             return "Nothing to commit, working tree clean."
+
         if self.gitToken is not None and any(err in result.stderr.lower() for err in
                                              ["authentication failed", "fatal: unable to access",
                                               "could not read from remote repository"]):
@@ -94,6 +95,9 @@ class GitHandler:
         """ Commits changes with a given commit message, description, and body. """
         commit_message = f"{message}\n\n{description}\n\n{body}"
         commit_result = self.run_git_command(["commit", "-am", commit_message])
+        if "Error: warning" in commit_result:
+            self.logger.warning(f"Warning message during commit: {commit_result}")
+            return f"Warning message {commit_result}"
         if "Error" in commit_result:
             raise RuntimeWarning(f"Commit failed to local with result {commit_result}")  # Raise warning on failure
 
