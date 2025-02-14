@@ -9,7 +9,7 @@ import pandas as pd
 
 class GitHandler:
     logger: LG
-    gitToken: str
+    gitToken: str = None
     remote: str
     pushToRemote: bool
 
@@ -279,13 +279,13 @@ class GitHandler:
 
         # Identify start and end of the existing summary (if any)
         summary_start = next((i for i, line in enumerate(lines) if "## 📊 LeetCode Summary" in line), None)
-        table_start = next((i for i, line in enumerate(lines) if "| Problem |" in line), None)
+        initTableStart = next((i for i, line in enumerate(lines) if "| Problem |" in line), None)
 
-        if table_start is None:
+        if initTableStart is None:
             print("⚠️ Table not found in README.md")
             return
 
-        table_start += 2  # Skip header lines
+        table_start = initTableStart + 2  # Skip header lines
         data_lines = [line.strip() for line in lines[table_start:] if line.strip().startswith("|")]
 
         # Extract data and clean it
@@ -314,7 +314,9 @@ class GitHandler:
 
         # Remove existing summary (if present)
         if summary_start is not None:
-            lines = lines[summary_start:]  # Remove old summary
+            linesBeforeSummary = lines[0:summary_start]
+            linesAfterSummary = lines[initTableStart:]
+            lines = linesBeforeSummary+linesAfterSummary
 
         # Write the updated content
         with open(readme_path, "w", encoding="utf-8") as file:
