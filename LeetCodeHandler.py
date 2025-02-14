@@ -41,7 +41,7 @@ class Leetcode:
         if countResponse.status_code != 200:
             self.logger.error(f"Error from Leetcode while fetching problem count. Check cookies or internet! \n"
                               f"Status Code: {countResponse.status_code}")
-            exit(0)  # Explicitly return None
+            exit(0)
         jsonResponse = countResponse.json()
         # We want to fetch all the questions at once
         dfDict = self.convert_to_defaultdict(jsonResponse)
